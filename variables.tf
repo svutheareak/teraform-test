@@ -24,9 +24,3 @@ variable "apps" {
     }
   }
 }
-
-variable "deploy_apps" {
-  description = "Which apps to deploy (choose from app1, app2, app3)"
-  type        = list(string)
-  default     = []
-}
