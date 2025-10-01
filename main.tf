@@ -1,17 +1,15 @@
 provider "docker" {}
 
-# Only take first `app_count` apps
+# only take as many apps as user said
 locals {
   selected_apps = slice(var.apps, 0, var.app_count)
 }
 
-# Pull images
 resource "docker_image" "images" {
   for_each = { for idx, app in local.selected_apps : idx => app }
   name     = each.value.image_url
 }
 
-# Run containers
 resource "docker_container" "containers" {
   for_each = { for idx, app in local.selected_apps : idx => app }
 
