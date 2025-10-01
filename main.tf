@@ -1,22 +1,44 @@
-provider "docker" {}
-
-# filter only the apps chosen by user
-locals {
-  selected_apps = {
-    for k, v in var.apps : k => v
-    if contains(var.deploy_apps, k)
+terraform {
+  required_providers {
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 3.0"
+    }
   }
+  required_version = ">= 1.6.0"
 }
 
-# pull docker images
+provider "docker" {}
+
+# variables inline (no variables.tf needed)
+variable "app_count" {
+  description = "How many apps to deploy (from the apps list)"
+  type        = number
+}
+
+variable "apps" {
+  description = "List of apps"
+  type = list(object({
+    app_name  = string
+    port      = number
+    image_url = string
+  }))
+}
+
+# Only take the first N apps (based on app_count)
+locals {
+  selected_apps = slice(var.apps, 0, var.app_count)
+}
+
+# Pull images
 resource "docker_image" "images" {
-  for_each = local.selected_apps
+  for_each = { for idx, app in local.selected_apps : idx => app }
   name     = each.value.image_url
 }
 
-# run docker containers
+# Run containers
 resource "docker_container" "containers" {
-  for_each = local.selected_apps
+  for_each = { for idx, app in local.selected_apps : idx => app }
 
   name  = each.value.app_name
   image = docker_image.images[each.key].name
@@ -29,10 +51,7 @@ resource "docker_container" "containers" {
   restart = "unless-stopped"
 }
 
-# output URLs
-output "app_urls" {
-  value = {
-    for k, v in local.selected_apps :
-    k => "http://localhost:${v.port}"
-  }
+# Output
+output "running_apps" {
+  value = [for app in local.selected_apps : "${app.app_name} running on port ${app.port}"]
 }
