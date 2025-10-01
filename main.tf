@@ -1,17 +1,22 @@
 provider "docker" {}
 
-# only take as many apps as user said
+# filter only the apps chosen by user
 locals {
-  selected_apps = slice(var.apps, 0, var.app_count)
+  selected_apps = {
+    for k, v in var.apps : k => v
+    if contains(var.deploy_apps, k)
+  }
 }
 
+# pull docker images
 resource "docker_image" "images" {
-  for_each = { for idx, app in local.selected_apps : idx => app }
+  for_each = local.selected_apps
   name     = each.value.image_url
 }
 
+# run docker containers
 resource "docker_container" "containers" {
-  for_each = { for idx, app in local.selected_apps : idx => app }
+  for_each = local.selected_apps
 
   name  = each.value.app_name
   image = docker_image.images[each.key].name
@@ -19,5 +24,15 @@ resource "docker_container" "containers" {
   ports {
     internal = 80
     external = each.value.port
+  }
+
+  restart = "unless-stopped"
+}
+
+# output URLs
+output "app_urls" {
+  value = {
+    for k, v in local.selected_apps :
+    k => "http://localhost:${v.port}"
   }
 }
